@@ -119,7 +119,7 @@ textarea{min-height:84px;resize:none;font-size:18px;line-height:1.4}
 .note{font-size:13.5px;color:var(--muted);background:var(--surface2);border-radius:14px;padding:10px 12px}
 
 /* Navigation unten */
-.bnav{flex:none;display:grid;grid-template-columns:repeat(2,1fr);background:var(--surface);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px))}
+.bnav{flex:none;display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px))}
 .bnav button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:12px;font-weight:600;color:var(--muted)}
 .bnav button .pill{width:56px;height:30px;border-radius:15px;display:grid;place-items:center}
 .bnav button[aria-current="page"]{color:var(--fg)}
@@ -178,6 +178,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></symbol>
     <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+    <symbol id="i-live" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.5"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
     <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"/></symbol>
   </defs>
 </svg>
@@ -194,6 +196,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 
 <nav class="bnav" id="bnav" aria-label="Navigation">
   <button data-tab="dub" aria-current="page"><span class="pill"><svg class="i"><use href="#i-film"/></svg></span>Synchronisieren</button>
+  <button data-tab="live"><span class="pill"><svg class="i"><use href="#i-live"/></svg></span>Live</button>
   <button data-tab="list"><span class="pill"><svg class="i"><use href="#i-list"/></svg></span>Meine Videos</button>
 </nav>
 
@@ -210,10 +213,10 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){retur
 function ic(n){return '<svg class="i"><use href="#i-'+n+'"/></svg>';}
 function load(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
 function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
-var set=Object.assign({voice:'',rate:1.1,bg:0.15,vol:1,autoUpd:true},load('fd-set',{}));
+var set=Object.assign({voice:'',rate:1.1,bg:0.15,vol:1,autoUpd:true,liveSpeak:true,liveEn:true,liveSize:20},load('fd-set',{}));
 var proj=load('fd-proj',null);          // {uri,name,duration,thumb,segments,result}
 var videos=load('fd-videos',[]);        // fertige Videos
-var tab='dub', busy=null, models=null, voices=[], tvSave;
+var tab='dub', busy=null, models=null, voices=[], tvSave, live={running:false,supported:true}, liveBusy=false;
 function saveSet(){save('fd-set',set);}
 function saveProj(){save('fd-proj',proj);}
 function saveVideos(){save('fd-videos',videos);}
@@ -247,7 +250,7 @@ if(Dub){try{Dub.addListener('progress',function(e){
 /* ================= Navigation ================= */
 function go(t){tab=t;Array.prototype.forEach.call(document.querySelectorAll('.bnav button'),function(b){if(b.dataset.tab===t)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});render();$('#main').scrollTop=0;}
 document.getElementById('bnav').addEventListener('click',function(e){var b=e.target.closest('button[data-tab]');if(b)go(b.dataset.tab);});
-function render(){if(tab==='dub')renderDub();else renderList();}
+function render(){if(tab==='dub')renderDub();else if(tab==='live')renderLive();else renderList();}
 
 /* ================= Synchronisieren ================= */
 function stepState(){
@@ -329,6 +332,52 @@ function renderDub(){
 
 function srtText(){
   return proj.segments.filter(function(s){return !s.off&&s.de;}).map(function(s,i){return (i+1)+'\n'+srtT(s.s)+' --> '+srtT(s.e)+'\n'+s.de+'\n';}).join('\n');
+}
+
+/* ================= Live ================= */
+function renderLive(){
+  var h='<div class="view"><h2>Live übersetzen</h2><p class="hint">Fox Dub hört mit, was in einer anderen App läuft, zum Beispiel X, YouTube oder Instagram. Darüber erscheinen deutsche Untertitel, auf Wunsch spricht die deutsche Stimme mit. Nichts wird aufgenommen oder gespeichert.</p>';
+  if(!isNative()){$('#main').innerHTML=h+'<div class="box"><b>Nur in der App</b></div></div>';return;}
+  if(!live.supported){$('#main').innerHTML=h+'<div class="box"><b>Nicht möglich</b><p class="hint">Der Live-Modus braucht Android 10 oder neuer.</p></div></div>';return;}
+  if(models&&!models.stt){
+    h+='<div class="box"><b>Erst einrichten</b><p class="hint">Der Live-Modus braucht die Sprachpakete (einmal etwa 70 MB).</p><button class="btn pri wide" data-act="tomodels">'+ic('down')+'Sprachpakete laden</button></div>';
+    $('#main').innerHTML=h+'</div>';return;
+  }
+  if(live.running){
+    h+='<div class="done"><b class="h">'+ic('live')+' Live läuft</b><small class="hint">Wechsle jetzt in X, YouTube oder eine andere App und starte ein Video. Das Untertitel-Fenster kannst du mit dem Finger verschieben, mit ✕ beendest du Live.</small>'+
+      '<button class="btn wide" style="background:var(--bad);color:#fff" data-act="livestop">'+ic('stop')+'Live beenden</button></div>';
+  }else{
+    h+='<button class="btn pri wide" data-act="livestart"'+(liveBusy?' disabled':'')+'>'+(liveBusy?'<span class="spin"></span>':ic('live'))+'Live starten</button>';
+  }
+  h+='<div class="box"><p class="lbl">Einstellungen</p>'+
+    '<div class="srow line" style="padding:0;background:none"><div><b>Deutsch mitsprechen</b><br><small>Das Video wird dabei kurz leiser</small></div><input type="checkbox" class="sw" id="liveSpeak"'+(set.liveSpeak?' checked':'')+' aria-label="Deutsch mitsprechen"></div>'+
+    '<div class="srow line" style="padding:0;background:none"><div><b>Englisch klein mit anzeigen</b><br><small>Zeigt, was gerade erkannt wird</small></div><input type="checkbox" class="sw" id="liveEn"'+(set.liveEn?' checked':'')+' aria-label="Englisch mit anzeigen"></div>'+
+    '<div><div class="sl"><label for="liveSize">Schriftgröße</label><span id="liveSizeV">'+set.liveSize+'</span></div><input type="range" id="liveSize" min="14" max="32" step="1" value="'+set.liveSize+'"></div>'+
+    '<small class="hint">Stimme und Sprechtempo kommen aus „Synchronisieren“.'+(live.running?' Änderungen gelten beim nächsten Start.':'')+'</small></div>'+
+    '<div class="note"><b>Beim ersten Start fragt Android dreimal:</b><br>1. „Mikrofon“: nur damit Fox Dub den Ton anderer Apps hören darf.<br>2. „Über anderen Apps einblenden“: für das Untertitel-Fenster. Schalte es ein und komm zurück.<br>3. „Aufnahme starten“: wähle, wenn gefragt, „Gesamter Bildschirm“. Es wird nichts gespeichert.</div>'+
+    '<p class="note">Die Übersetzung kommt etwa 1–2 Sekunden nach dem Gesprochenen. Manche Apps sperren das Mithören. Dann zeigt das Fenster „Kein Ton zu hören“.</p>';
+  $('#main').innerHTML=h+'</div>';
+}
+async function refreshLive(){if(!Dub)return;try{live=await Dub.liveStatus();}catch(e){}if(tab==='live')renderLive();}
+async function liveStart(){
+  liveBusy=true;renderLive();
+  try{
+    await Dub.liveStart({speak:set.liveSpeak,showEn:set.liveEn,size:set.liveSize,voice:set.voice,rate:set.rate});
+    setTimeout(async function(){await refreshLive();if(!live.running&&live.error)toast('Live startet nicht: '+live.error,6000);},1500);
+    toast('Live läuft. Wechsle jetzt in X oder YouTube.',5000);
+  }catch(e){
+    var c=e&&e.code,m=errText(e);
+    if(c==='OVERLAY')openSheet('<h3>Noch eine Erlaubnis</h3><div class="srow"><small style="color:var(--fg)">Android hat gerade die Einstellung „Über anderen Apps einblenden“ geöffnet. Schalte sie für Fox Dub ein, komm zurück und tippe nochmal auf „Live starten“.</small></div><button class="btn wide" data-act="close">OK</button>');
+    else if(c!=='CANCEL'&&!/abgebrochen/i.test(m))toast(m,6000);
+  }finally{liveBusy=false;refreshLive();}
+}
+
+/* ================= Geteilte Videos ================= */
+function adoptShared(v){
+  var take=function(){proj={uri:v.uri,name:v.name,duration:v.duration,thumb:v.thumb||'',segments:null,result:null};saveProj();go('dub');toast('Video übernommen. Tippe auf „Englisch erkennen und übersetzen“.',5000);};
+  if(busy){toast('Fox Dub arbeitet gerade. Teile das Video danach nochmal.',5000);return;}
+  if(proj&&proj.segments&&!proj.result){window.__share=take;openSheet('<h3>Geteiltes Video übernehmen?</h3><div class="srow"><small style="color:var(--fg)">„'+esc(v.name)+'“ ersetzt das aktuelle Video. Die erkannten Sätze von „'+esc(proj.name)+'“ gehen dabei verloren.</small></div><button class="btn pri wide" data-act="shareyes">Übernehmen</button><button class="btn wide" data-act="close">Abbrechen</button>');}
+  else take();
 }
 
 /* ================= Meine Videos ================= */
@@ -464,12 +513,15 @@ document.addEventListener('input',function(e){
   var t=e.target;
   if(t.dataset&&t.dataset.seg!=null&&proj&&proj.segments){proj.segments[+t.dataset.seg].de=t.value;clearTimeout(tvSave);tvSave=setTimeout(saveProj,600);}
   else if(t.id==='rate'){set.rate=parseFloat(t.value);$('#rateV').textContent=Math.round(set.rate*100)+' %';}
+  else if(t.id==='liveSize'){set.liveSize=parseInt(t.value,10);$('#liveSizeV').textContent=set.liveSize;}
   else if(t.id==='bg'){set.bg=parseFloat(t.value);$('#bgV').textContent=Math.round(set.bg*100)+' %';}
 });
 document.addEventListener('change',function(e){
   var t=e.target;
   if(t.id==='voiceSel'){set.voice=t.value;saveSet();Dub.preview({text:'Hallo, so klingt diese Stimme.',voice:set.voice,rate:set.rate});}
-  else if(t.id==='rate'||t.id==='bg')saveSet();
+  else if(t.id==='rate'||t.id==='bg'||t.id==='liveSize')saveSet();
+  else if(t.id==='liveSpeak'){set.liveSpeak=t.checked;saveSet();}
+  else if(t.id==='liveEn'){set.liveEn=t.checked;saveSet();}
 });
 document.addEventListener('click',async function(e){
   var b=e.target.closest('[data-act]');if(!b)return;
@@ -495,6 +547,10 @@ document.addEventListener('click',async function(e){
     case 'share':Dub.share({uri:b.dataset.uri}).catch(function(err){toast(errText(err));});break;
     case 'delv':videos.splice(i,1);saveVideos();renderList();break;
     case 'ttsset':closeSheet();Dub.ttsSettings().catch(function(){toast('Einstellungen lassen sich nicht öffnen.');});break;
+    case 'livestart':liveStart();break;
+    case 'livestop':try{await Dub.liveStop();}catch(x){}setTimeout(refreshLive,400);break;
+    case 'tomodels':go('dub');break;
+    case 'shareyes':closeSheet();if(window.__share)window.__share();break;
     case 'upd':closeSheet();checkUpdate(true);break;
     case 'updgo':doUpdate();break;
   }
@@ -506,7 +562,13 @@ setTimeout(function(){$('#splash').classList.add('hide');},900);
 if(Dub){
   refreshModels();loadVoices();
   if(proj&&proj.uri)Dub.exists({uri:proj.uri}).then(function(r){if(!r.ok&&!busy){proj=null;saveProj();renderDub();toast('Das letzte Video ist nicht mehr da.');}}).catch(function(){});
-  document.addEventListener('visibilitychange',function(){if(!document.hidden&&!busy)loadVoices();});
+  document.addEventListener('visibilitychange',function(){if(!document.hidden){refreshLive();if(!busy)loadVoices();}});
+  refreshLive();
+  try{Dub.addListener('shared',function(e){
+    if(e.busy){toast('Geteiltes Video wird übernommen …',8000);return;}
+    if(e.error){toast(e.error,7000);return;}
+    adoptShared(e);
+  });}catch(x){}
 }
 if(isNative()&&set.autoUpd){
   var lastU=0;try{lastU=Number(localStorage.getItem('fd-upd-t')||0);}catch(e){}

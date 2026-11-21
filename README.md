@@ -7,7 +7,10 @@ Englische Videos automatisch auf Deutsch vertonen, direkt auf dem Handy, kostenl
 3. **Text prüfen:** jeden Satz anhören, verbessern oder stumm schalten
 4. **Vertonen:** die deutsche Stimme des Handys spricht jeden Satz an seiner Stelle, der Originalton bleibt leise im Hintergrund. Das fertige Video landet in der Galerie unter „Movies/Fox Dub“.
 
-Zusätzlich: deutsche Untertitel (SRT) teilen, Liste „Meine Videos“.
+Zusätzlich:
+- **Teilen an Fox Dub:** Videodatei in Galerie, WhatsApp, Telegram teilen → Fox Dub übernimmt sie sofort
+- **Live-Modus (ab Android 10):** hört den Ton anderer Apps mit (X, YouTube, Instagram …) und zeigt deutsche Untertitel darüber an, auf Wunsch mit deutscher Stimme
+- deutsche Untertitel (SRT) teilen, Liste „Meine Videos“
 
 Beim ersten Start werden einmal etwa 70 MB Sprachpakete geladen. Danach braucht Fox Dub kein Internet.
 

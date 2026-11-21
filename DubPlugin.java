@@ -1,5 +1,6 @@
 package de.foxdub.app;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.ContentValues;
@@ -15,12 +16,14 @@ import android.media.MediaFormat;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaMuxer;
 import android.media.MediaScannerConnection;
+import android.media.projection.MediaProjectionManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
+import android.provider.Settings;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.speech.tts.Voice;
@@ -28,15 +31,19 @@ import android.util.Base64;
 import android.view.WindowManager;
 
 import androidx.activity.result.ActivityResult;
+import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 
 import com.google.android.gms.tasks.Tasks;
 import com.google.mlkit.common.model.DownloadConditions;
@@ -85,7 +92,9 @@ import java.util.zip.ZipInputStream;
 // 1. Ton aus dem Video lesen  2. Englisch erkennen (Vosk, offline)
 // 3. Übersetzen (Google ML Kit, offline)  4. Deutsche Stimme (Android-Sprachausgabe)
 // 5. Neue Tonspur mischen und mit dem Originalbild zu einer MP4 zusammensetzen.
-@CapacitorPlugin(name = "Dub")
+@CapacitorPlugin(name = "Dub", permissions = {
+        @Permission(strings = {Manifest.permission.RECORD_AUDIO}, alias = "mic")
+})
 public class DubPlugin extends Plugin {
 
     private static final String MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip";
@@ -109,7 +118,64 @@ public class DubPlugin extends Plugin {
     // ------------------------------------------------------------------ Start
 
     @Override
-    public void load() { initTts(); }
+    public void load() {
+        initTts();
+        Activity a = getActivity();
+        if (a != null) handleShare(a.getIntent());
+    }
+
+    @Override
+    protected void handleOnNewIntent(Intent intent) {
+        super.handleOnNewIntent(intent);
+        handleShare(intent);
+    }
+
+    // ------------------------------------------------------------------ "Teilen an Fox Dub"
+
+    private void handleShare(Intent i) {
+        if (i == null || !Intent.ACTION_SEND.equals(i.getAction())) return;
+        Uri u = i.getParcelableExtra(Intent.EXTRA_STREAM);
+        i.setAction(Intent.ACTION_MAIN);          // nur einmal verarbeiten
+        if (u == null) {
+            JSObject o = new JSObject();
+            o.put("error", "Es wurde keine Videodatei geteilt. Bei X oder YouTube wird nur ein Link geteilt – nimm dafür den Live-Modus.");
+            notifyListeners("shared", o, true);
+            return;
+        }
+        JSObject s = new JSObject();
+        s.put("busy", true);
+        notifyListeners("shared", s, true);
+        exec.execute(() -> {
+            try {
+                File f = copyShared(u);
+                notifyListeners("shared", videoInfo(Uri.fromFile(f)), true);
+            } catch (Exception e) {
+                JSObject o = new JSObject();
+                o.put("error", "Das geteilte Video konnte nicht übernommen werden: " + msg(e));
+                notifyListeners("shared", o, true);
+            }
+        });
+    }
+
+    private File copyShared(Uri u) throws Exception {
+        String name = "Geteiltes Video.mp4";
+        try (Cursor c = getContext().getContentResolver().query(u, null, null, null, null)) {
+            if (c != null && c.moveToFirst()) {
+                int ni = c.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (ni >= 0 && c.getString(ni) != null) name = c.getString(ni);
+            }
+        } catch (Exception ignored) {}
+        name = name.replaceAll("[\\\\/:*?\"<>|]", "_");
+        File dir = new File(getContext().getFilesDir(), "shared");
+        deleteRec(dir);
+        dir.mkdirs();
+        File f = new File(dir, name);
+        try (InputStream in = getContext().getContentResolver().openInputStream(u); OutputStream out = new FileOutputStream(f)) {
+            if (in == null) throw new Exception("Datei nicht lesbar");
+            copy(in, out);
+        }
+        return f;
+    }
 
     private void initTts() {
         ttsInit = new CountDownLatch(1);
@@ -209,6 +275,11 @@ public class DubPlugin extends Plugin {
                 if (ni >= 0 && c.getString(ni) != null) name = c.getString(ni);
                 if (si >= 0) size = c.getLong(si);
             }
+        }
+        if ("file".equals(uri.getScheme()) && uri.getPath() != null) {
+            File f = new File(uri.getPath());
+            name = f.getName();
+            size = f.length();
         }
         o.put("name", name);
         o.put("size", size);
@@ -1073,6 +1144,72 @@ public class DubPlugin extends Plugin {
         byte[] b = new byte[1 << 16];
         int n;
         while ((n = in.read(b)) > 0) out.write(b, 0, n);
+    }
+
+    // ------------------------------------------------------------------ Live-Modus
+
+    @PluginMethod
+    public void liveStart(PluginCall call) {
+        if (Build.VERSION.SDK_INT < 29) { call.reject("Der Live-Modus braucht Android 10 oder neuer.", "OLD"); return; }
+        if (!sttReady()) { call.reject("Lade zuerst die Sprachpakete.", "MODELS"); return; }
+        if (getPermissionState("mic") != PermissionState.GRANTED) {
+            requestPermissionForAlias("mic", call, "micResult");
+            return;
+        }
+        liveStep2(call);
+    }
+
+    @PermissionCallback
+    private void micResult(PluginCall call) {
+        if (getPermissionState("mic") == PermissionState.GRANTED) liveStep2(call);
+        else call.reject("Ohne die Erlaubnis „Mikrofon“ darf Fox Dub den Ton anderer Apps nicht hören.", "MIC");
+    }
+
+    private void liveStep2(PluginCall call) {
+        if (!Settings.canDrawOverlays(getContext())) {
+            try {
+                Intent i = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getContext().getPackageName()));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(i);
+            } catch (Exception ignored) {}
+            call.reject("Erlaube „Über anderen Apps einblenden“ für Fox Dub.", "OVERLAY");
+            return;
+        }
+        MediaProjectionManager mpm = (MediaProjectionManager) getContext().getSystemService(Context.MEDIA_PROJECTION_SERVICE);
+        startActivityForResult(call, mpm.createScreenCaptureIntent(), "projResult");
+    }
+
+    @ActivityCallback
+    private void projResult(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null) { call.reject("Abgebrochen", "CANCEL"); return; }
+        Intent s = new Intent(getContext(), LiveService.class);
+        s.putExtra("code", result.getResultCode());
+        s.putExtra("data", result.getData());
+        s.putExtra("speak", call.getBoolean("speak", true));
+        s.putExtra("showEn", call.getBoolean("showEn", true));
+        s.putExtra("rate", call.getFloat("rate", 1.1f));
+        s.putExtra("size", call.getFloat("size", 20f));
+        s.putExtra("voice", call.getString("voice", ""));
+        try {
+            ContextCompat.startForegroundService(getContext(), s);
+            call.resolve();
+        } catch (Exception e) { call.reject("Live-Modus startet nicht: " + msg(e)); }
+    }
+
+    @PluginMethod
+    public void liveStop(PluginCall call) {
+        getContext().stopService(new Intent(getContext(), LiveService.class));
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void liveStatus(PluginCall call) {
+        JSObject o = new JSObject();
+        o.put("running", LiveService.running);
+        o.put("supported", Build.VERSION.SDK_INT >= 29);
+        if (LiveService.lastError != null) o.put("error", LiveService.lastError);
+        call.resolve(o);
     }
 
     // ------------------------------------------------------------------ Abspielen, Teilen

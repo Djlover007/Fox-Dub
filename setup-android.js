@@ -23,7 +23,7 @@ const pkg = (fs.readFileSync(generated, 'utf8').match(/^\s*package\s+([\w.]+)\s*
 if (!pkg) fail('Paketname nicht lesbar');
 console.log('Android-Paket: ' + pkg);
 
-for (const f of ['MainActivity.java', 'DubPlugin.java', 'UpdatePlugin.java']) {
+for (const f of ['MainActivity.java', 'DubPlugin.java', 'LiveService.java', 'UpdatePlugin.java']) {
   const src = fs.readFileSync(f, 'utf8').replace(/^\s*package\s+[\w.]+\s*;/m, 'package ' + pkg + ';');
   fs.writeFileSync(path.join(dir, f), src);
   console.log('kopiert: ' + f);
@@ -34,7 +34,13 @@ const manifest = path.join('android', 'app', 'src', 'main', 'AndroidManifest.xml
 let xml = fs.readFileSync(manifest, 'utf8');
 const perms = [
   '<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />',
-  '<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />'
+  '<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />',
+  '<uses-permission android:name="android.permission.RECORD_AUDIO" />',
+  '<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />',
+  '<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />',
+  '<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />',
+  '<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />',
+  '<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />'
 ];
 const missing = perms.filter(p => !xml.includes(p.match(/android:name="([^"]+)"/)[1]));
 if (missing.length) xml = xml.replace('</manifest>', missing.map(p => '    ' + p + '\n').join('') + '</manifest>');
@@ -48,7 +54,26 @@ if (!xml.includes('TTS_SERVICE')) {
     '    </queries>\n</manifest>');
   console.log('Sprachausgabe sichtbar gemacht');
 }
-if (!xml.includes('largeHeap')) xml = xml.replace('<application', '<application\n        android:largeHeap="true"');
+// largeHeap fuer lange Videos; eigene Stimme nicht selbst wieder mithoeren
+if (!xml.includes('largeHeap')) xml = xml.replace('<application', '<application\n        android:largeHeap="true"\n        android:allowAudioPlaybackCapture="false"');
+// Live-Dienst
+if (!xml.includes('LiveService')) {
+  xml = xml.replace('</application>',
+    '    <service android:name=".LiveService" android:exported="false" android:foregroundServiceType="mediaProjection|microphone" />\n    </application>');
+  console.log('Live-Dienst eingetragen');
+}
+// "Teilen an Fox Dub" fuer Videodateien
+if (!xml.includes('android.intent.action.SEND')) {
+  const xml2 = xml.replace(/(<activity[^>]*?android:name="\.MainActivity"[\s\S]*?)(<\/activity>)/,
+    '$1    <intent-filter>\n' +
+    '                <action android:name="android.intent.action.SEND" />\n' +
+    '                <category android:name="android.intent.category.DEFAULT" />\n' +
+    '                <data android:mimeType="video/*" />\n' +
+    '            </intent-filter>\n        $2');
+  if (xml2 === xml) fail('MainActivity im Manifest nicht gefunden');
+  xml = xml2;
+  console.log('Teilen-Ziel eingetragen');
+}
 if (!xml.includes('foxupdate')) {
   xml = xml.replace('</application>',
     '    <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.foxupdate" android:exported="false" android:grantUriPermissions="true">\n' +
