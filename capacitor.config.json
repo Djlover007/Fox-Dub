@@ -1,0 +1,9 @@
+{
+  "appId": "de.foxdub.app",
+  "appName": "Fox Dub",
+  "webDir": "www",
+  "android": { "backgroundColor": "#f7f5f2" },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}

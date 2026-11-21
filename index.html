@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Fox Dub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one-screen app shell. Header, scrolling main area, bottom navigation. Sheets slide up from the bottom. */
+:root{
+  --bg:#f7f5f2; --surface:#ffffff; --surface2:#efebe6; --fg:#17130f; --muted:#6f685f; --line:#e6e0d9;
+  --accent:#e8640c; --accent-ink:#ffffff; --accent-soft:#fde6d4;
+  --green:#14a37f; --green-soft:#d9f2ea; --brand:#5b3fd1; --good:#178a5a; --good-soft:#dcf3e6; --bad:#d0342c; --bad-soft:#fbe3e1;
+  --shadow:rgba(40,24,10,.14);
+  --font-display:'Bricolage Grotesque','Figtree',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --font-body:'Figtree',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0c0c0f;--surface:#18181d;--surface2:#232329;--fg:#f4f4f6;--muted:#a4a4ae;--line:#2b2b32;
+    --accent:#ff7a1a;--accent-ink:#1b0c02;--accent-soft:rgba(255,122,26,.16);
+    --green:#2cc79c;--green-soft:rgba(44,199,156,.15);--good:#4cd08f;--good-soft:rgba(76,208,143,.14);--bad:#ff6f61;--bad-soft:rgba(255,111,97,.14);
+    --shadow:rgba(0,0,0,.55);color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0c0c0f;--surface:#18181d;--surface2:#232329;--fg:#f4f4f6;--muted:#a4a4ae;--line:#2b2b32;
+  --accent:#ff7a1a;--accent-ink:#1b0c02;--accent-soft:rgba(255,122,26,.16);
+  --green:#2cc79c;--green-soft:rgba(44,199,156,.15);--good:#4cd08f;--good-soft:rgba(76,208,143,.14);--bad:#ff6f61;--bad-soft:rgba(255,111,97,.14);
+  --shadow:rgba(0,0,0,.55);color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{display:flex;flex-direction:column;overflow:hidden;background:var(--bg);color:var(--fg);font:400 16px/1.45 var(--font-body);
+  padding-top:env(safe-area-inset-top,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* Kopf */
+.head{display:flex;align-items:center;gap:10px;padding:12px 16px 6px;flex:none}
+.logo{width:40px;height:40px;border-radius:12px;background:var(--brand);display:grid;place-items:center;flex:none}
+.logo svg{width:30px;height:30px}
+.brand{flex:1;min-width:0;display:flex;flex-direction:column}
+.brand b{font:800 25px/1.05 var(--font-display);letter-spacing:-.02em}
+.brand small{font-size:12px;color:var(--muted);letter-spacing:.04em;margin-top:2px}
+.brand small span{color:var(--accent);font-weight:700}
+.ib{width:44px;height:44px;border-radius:50%;border:0;background:transparent;display:grid;place-items:center;color:var(--fg)}
+.ib:active{background:var(--surface2)}
+
+main{flex:1;min-height:0;overflow-y:auto;padding:6px 16px 24px;-webkit-overflow-scrolling:touch}
+.view{display:flex;flex-direction:column;gap:14px;max-width:680px;margin:0 auto}
+h2{font:700 22px/1.2 var(--font-display);margin:6px 0 0;letter-spacing:-.01em;text-wrap:balance}
+.hint{color:var(--muted);font-size:14px;margin:0}
+.lbl{font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 6px}
+
+/* Bausteine */
+.box{background:var(--surface);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 1px 0 var(--line)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{border:0;border-radius:14px;padding:12px 16px;font-weight:700;font-size:15px;background:var(--surface2);color:var(--fg);display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:46px}
+.btn.pri{background:var(--accent);color:var(--accent-ink)}
+.btn.grn{background:var(--green);color:#fff}
+.btn.sm{min-height:38px;padding:7px 12px;font-size:14px;border-radius:12px}
+.btn.wide{width:100%}
+.btn:disabled{opacity:.5}
+.btn svg.i{width:18px;height:18px}
+select,input[type=text],input[type=password],textarea{width:100%;border:0;border-radius:12px;background:var(--surface2);padding:12px 14px;color:var(--fg)}
+select{height:46px;padding:0 12px;font-weight:600}
+textarea{min-height:84px;resize:none;font-size:18px;line-height:1.4}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{white-space:nowrap;flex:none;border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 13px;font-weight:600;font-size:14px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chips.scroll{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:2px 16px}
+.chips.scroll::-webkit-scrollbar{display:none}
+.chip.add{border-style:dashed;color:var(--muted)}
+
+.prog{height:8px;border-radius:4px;background:var(--surface2);overflow:hidden}
+.prog i{display:block;height:100%;background:var(--accent);transition:width .3s}
+.empty{text-align:center;color:var(--muted);padding:28px 16px;display:flex;flex-direction:column;gap:12px;align-items:center}
+.empty svg{width:64px;height:64px}
+
+/* Video */
+.pick{border:2px dashed var(--line);background:var(--surface);border-radius:22px;padding:30px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;width:100%}
+.pick .big{width:72px;height:72px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;box-shadow:0 10px 26px color-mix(in srgb,var(--accent) 38%,transparent)}
+.pick .big svg{width:34px;height:34px}
+.pick b{font:700 20px/1.2 var(--font-display)}
+.pick small{color:var(--muted);font-size:14px}
+.vid{display:flex;gap:12px;align-items:center}
+.vid .th{width:112px;height:63px;border-radius:12px;background:var(--surface2) center/cover no-repeat;flex:none;display:grid;place-items:center;color:var(--muted)}
+.vid .tx{flex:1;min-width:0}
+.vid .tx b{display:block;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vid .tx small{color:var(--muted);font-size:13.5px}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.step{background:var(--surface);border-radius:14px;padding:9px 6px;text-align:center;font-size:12.5px;font-weight:700;color:var(--muted)}
+.step b{display:block;font:800 18px/1.1 var(--font-display);color:var(--muted)}
+.step.on{background:var(--accent-soft);color:var(--fg)}
+.step.on b{color:var(--accent)}
+.step.ok b{color:var(--good)}
+.busy{background:var(--surface);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px;border-left:5px solid var(--accent)}
+.busy .t{display:flex;justify-content:space-between;gap:10px;font-weight:700}
+.busy .t span{font:800 20px var(--font-display);color:var(--accent);font-variant-numeric:tabular-nums}
+.seg{background:var(--surface);border-radius:18px;padding:12px 12px 12px 14px;display:flex;flex-direction:column;gap:8px}
+.seg.off{opacity:.5}
+.seg .top{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--muted);letter-spacing:.04em}
+.seg .top .tm{flex:1;font-variant-numeric:tabular-nums}
+.seg .en{color:var(--muted);font-size:14.5px;overflow-wrap:anywhere}
+.seg textarea{min-height:0;font-size:17px;padding:10px 12px}
+.ib.sm{width:38px;height:38px;background:var(--surface2)}
+.ib.sm svg.i{width:18px;height:18px}
+.done{background:var(--good-soft);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.done b.h{font:700 20px/1.2 var(--font-display)}
+.sl{display:flex;justify-content:space-between;font-weight:700}
+.sl span{color:var(--accent);font-variant-numeric:tabular-nums}
+.note{font-size:13.5px;color:var(--muted);background:var(--surface2);border-radius:14px;padding:10px 12px}
+
+/* Navigation unten */
+.bnav{flex:none;display:grid;grid-template-columns:repeat(2,1fr);background:var(--surface);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px))}
+.bnav button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:12px;font-weight:600;color:var(--muted)}
+.bnav button .pill{width:56px;height:30px;border-radius:15px;display:grid;place-items:center}
+.bnav button[aria-current="page"]{color:var(--fg)}
+.bnav button[aria-current="page"] .pill{background:var(--accent-soft);color:var(--accent)}
+.bnav .badge{position:absolute;margin:-16px 0 0 24px;min-width:18px;height:18px;border-radius:9px;background:var(--accent);color:var(--accent-ink);font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 5px}
+
+/* Blatt von unten */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.open{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;background:var(--bg);border-radius:24px 24px 0 0;max-height:88%;overflow-y:auto;padding:10px 18px calc(22px + env(safe-area-inset-bottom,0px));transform:translateY(105%);transition:transform .25s ease;display:flex;flex-direction:column;gap:12px}
+.sheet.open{transform:none}
+.sheet .grip{width:40px;height:5px;border-radius:3px;background:var(--line);align-self:center;margin-bottom:4px}
+.sheet h3{font:700 21px/1.2 var(--font-display);margin:0}
+.srow{background:var(--surface);border-radius:16px;padding:13px 14px;display:flex;flex-direction:column;gap:8px}
+.srow.line{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}
+.srow small{color:var(--muted);font-size:13.5px}
+.sw{appearance:none;width:50px;height:30px;border-radius:15px;background:var(--line);position:relative;flex:none;transition:background .2s}
+.sw::after{content:'';position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sw:checked{background:var(--green)}
+.sw:checked::after{transform:translateX(20px)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+
+.toast{position:fixed;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:60;background:var(--fg);color:var(--bg);padding:13px 16px;border-radius:14px;font-size:15px;box-shadow:0 8px 24px var(--shadow);opacity:0;transform:translateY(10px);transition:opacity .2s,transform .2s;pointer-events:none;max-width:560px;margin:0 auto}
+.toast.on{opacity:1;transform:none}
+.spin{display:inline-block;width:18px;height:18px;border:2.5px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-3px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+#splash{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:var(--bg);transition:opacity .45s ease,visibility 0s .45s}
+#splash.hide{opacity:0;visibility:hidden}
+#splash .sp-logo{width:104px;height:104px;border-radius:30px;display:grid;place-items:center;background:var(--brand);box-shadow:0 14px 34px var(--shadow);animation:spPop .6s cubic-bezier(.2,.9,.3,1.3) both}
+#splash .sp-logo svg{width:74px;height:74px}
+#splash b{font:800 32px/1.1 var(--font-display);letter-spacing:-.02em;margin-top:8px;animation:spUp .5s .15s ease both}
+#splash small{font-size:14px;color:var(--muted);letter-spacing:.06em;animation:spUp .5s .3s ease both}
+#splash small span{color:var(--accent);font-weight:700}
+@keyframes spPop{from{transform:scale(.6);opacity:0}}
+@keyframes spUp{from{transform:translateY(10px);opacity:0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="fox" viewBox="0 0 112 108">
+      <polygon fill="#F57C1F" points="12,10 38,30 62,30 88,10 93,50 50,93 7,50"/><polygon fill="#FFF1DC" points="7,50 38,60 50,93"/><polygon fill="#FFF1DC" points="93,50 62,60 50,93"/><polygon fill="#D65C0C" points="17,19 31,31 18,42"/><polygon fill="#D65C0C" points="83,19 69,31 82,42"/><polygon fill="#2A1608" points="30,47 42,52 31,54"/><polygon fill="#2A1608" points="70,47 58,52 69,54"/><polygon fill="#2A1608" points="43,81 57,81 50,93"/>
+      <rect x="64" y="64" width="42" height="32" rx="9" fill="#fff"/><polygon fill="#5B3FD1" points="72,71 72,89 86,80"/><path d="M89 72a10 10 0 0 1 0 16M94 68a15 15 0 0 1 0 24" fill="none" stroke="#F57C1F" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-film" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></symbol>
+    <symbol id="i-speak" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></symbol>
+    <symbol id="i-mute" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m22 9-6 6M16 9l6 6"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></symbol>
+    <symbol id="i-sub" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 13h4M13 13h5M6 16h8M16 16h2"/></symbol>
+    <symbol id="i-wand" viewBox="0 0 24 24"><path d="m15 4-1 3M19 8l-3 1M18 3l-2 2M4 20 14 10"/><path d="m12 8 4 4"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"/></symbol>
+  </defs>
+</svg>
+
+<div id="splash" aria-hidden="true"><div class="sp-logo"><svg viewBox="0 0 112 108"><use href="#fox"/></svg></div><b>Fox Dub</b><small>Design by <span>Mr.Fox</span></small></div>
+
+<header class="head">
+  <div class="logo"><svg viewBox="0 0 112 108" aria-hidden="true"><use href="#fox"/></svg></div>
+  <div class="brand"><b>Fox Dub</b><small>Englisch → <span>Deutsch</span></small></div>
+  <button class="ib" data-act="settings" aria-label="Einstellungen"><svg class="i"><use href="#i-gear"/></svg></button>
+</header>
+
+<main id="main"></main>
+
+<nav class="bnav" id="bnav" aria-label="Navigation">
+  <button data-tab="dub" aria-current="page"><span class="pill"><svg class="i"><use href="#i-film"/></svg></span>Synchronisieren</button>
+  <button data-tab="list"><span class="pill"><svg class="i"><use href="#i-list"/></svg></span>Meine Videos</button>
+</nav>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+'use strict';
+/* ================= Grundlagen ================= */
+var REPO='__REPO__';
+function $(s,r){return (r||document).querySelector(s);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function ic(n){return '<svg class="i"><use href="#i-'+n+'"/></svg>';}
+function load(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+var set=Object.assign({voice:'',rate:1.1,bg:0.15,vol:1,autoUpd:true},load('fd-set',{}));
+var proj=load('fd-proj',null);          // {uri,name,duration,thumb,segments,result}
+var videos=load('fd-videos',[]);        // fertige Videos
+var tab='dub', busy=null, models=null, voices=[], tvSave;
+function saveSet(){save('fd-set',set);}
+function saveProj(){save('fd-proj',proj);}
+function saveVideos(){save('fd-videos',videos);}
+
+var tT;function toast(m,ms){var t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tT);tT=setTimeout(function(){t.classList.remove('on');},ms||3800);}
+function isNative(){try{return !!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform());}catch(e){return false;}}
+function plug(name){
+  if(!isNative())return null;
+  try{return (Capacitor.Plugins&&Capacitor.Plugins[name])||Capacitor.registerPlugin(name);}catch(e){return null;}
+}
+async function fetchT(url,opt,ms){
+  var ctl=new AbortController(),t=setTimeout(function(){ctl.abort();},ms||15000);
+  try{return await fetch(url,Object.assign({signal:ctl.signal},opt||{}));}finally{clearTimeout(t);}
+}
+function errText(e){return String((e&&e.message)||e||'Unbekannter Fehler');}
+function tm(t){t=Math.max(0,t||0);var m=Math.floor(t/60),s=Math.floor(t%60);return m+':'+(s<10?'0':'')+s;}
+function dur(t){t=Math.round(t||0);if(t<60)return t+' Sek.';var h=Math.floor(t/3600),m=Math.floor(t%3600/60);return h?h+' Std. '+m+' Min.':m+' Min. '+(t%60?t%60+' Sek.':'');}
+function srtT(t){var ms=Math.round(t*1000),h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),s=Math.floor(ms%60000/1000),r=ms%1000;function p(n,l){n=String(n);while(n.length<l)n='0'+n;return n;}return p(h,2)+':'+p(m,2)+':'+p(s,2)+','+p(r,3);}
+function voiceLabel(v){
+  var code=String(v.name||'').replace(/^de-[a-z]{2}-x-/i,'').replace(/-(local|network)$/i,'').toUpperCase();
+  var land={DE:'Deutschland',AT:'Österreich',CH:'Schweiz',BE:'Belgien',LU:'Luxemburg'}[String(v.country||'').toUpperCase()]||'';
+  return 'Stimme '+code+(land&&land!=='Deutschland'?' · '+land:'')+(v.online?' · braucht Internet':'')+(v.missing?' · nicht geladen':'');
+}
+
+var Dub=plug('Dub');
+if(Dub){try{Dub.addListener('progress',function(e){
+  if(!busy)return;busy.pct=e.pct;busy.msg=e.msg;
+  var a=$('#bpP'),b=$('#bpB'),c=$('#bpM');if(a)a.textContent=e.pct+' %';if(b)b.style.width=e.pct+'%';if(c)c.textContent=e.msg;
+});}catch(x){}}
+
+/* ================= Navigation ================= */
+function go(t){tab=t;Array.prototype.forEach.call(document.querySelectorAll('.bnav button'),function(b){if(b.dataset.tab===t)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});render();$('#main').scrollTop=0;}
+document.getElementById('bnav').addEventListener('click',function(e){var b=e.target.closest('button[data-tab]');if(b)go(b.dataset.tab);});
+function render(){if(tab==='dub')renderDub();else renderList();}
+
+/* ================= Synchronisieren ================= */
+function stepState(){
+  if(!proj)return 1;
+  if(!proj.segments)return 2;
+  return proj.result?4:3;
+}
+function busyBox(){
+  return '<div class="busy" aria-live="polite"><div class="t"><div>'+esc(busy.title)+'</div><span id="bpP">'+(busy.pct||0)+' %</span></div>'+
+    '<div class="prog"><i id="bpB" style="width:'+(busy.pct||0)+'%"></i></div><small class="hint" id="bpM">'+esc(busy.msg||'Startet …')+'</small>'+
+    '<p class="note">Lass Fox Dub dabei geöffnet. Der Bildschirm bleibt so lange an.</p>'+
+    '<button class="btn wide" data-act="cancel">Abbrechen</button></div>';
+}
+function renderDub(){
+  var h='<div class="view">';
+  if(!isNative()){
+    h+='<div class="box"><b>Nur in der App</b><p class="hint">Fox Dub arbeitet mit der Spracherkennung, dem Übersetzer und der Stimme deines Handys. Installiere die APK, dann geht es los.</p></div></div>';
+    $('#main').innerHTML=h;return;
+  }
+  var st=stepState();
+  h+='<div class="steps">'+
+    '<div class="step '+(st>1?'ok':'on')+'"><b>'+(st>1?'✓':'1')+'</b>Video</div>'+
+    '<div class="step '+(st>2?'ok':st===2?'on':'')+'"><b>'+(st>2?'✓':'2')+'</b>Übersetzen</div>'+
+    '<div class="step '+(st>3?'ok':st===3?'on':'')+'"><b>'+(st>3?'✓':'3')+'</b>Vertonen</div></div>';
+
+  if(models&&!(models.stt&&models.translate)&&!(busy&&busy.kind==='model')){
+    h+='<div class="box"><b>Einmal einrichten</b><p class="hint">Fox Dub braucht einmal die Spracherkennung für Englisch und den Übersetzer Englisch → Deutsch, zusammen etwa 70 MB. Am besten im WLAN. Danach läuft alles ohne Internet und kostenlos.</p>'+
+      '<button class="btn pri wide" data-act="models"'+(busy?' disabled':'')+'>'+ic('down')+'Sprachpakete laden</button></div>';
+  }
+  if(busy&&busy.kind==='model')h+=busyBox();
+
+  if(!proj){
+    h+='<button class="pick" data-act="pick"><span class="big">'+ic('plus')+'</span><b>Englisches Video wählen</b><small>Aus deiner Galerie oder deinen Dateien. Fox Dub macht daraus eine deutsche Fassung.</small></button>'+
+      '<p class="note">Am besten klappt es mit klar gesprochenen Videos: Erklärvideos, Dokus, Interviews, Vlogs. Laute Musik oder viele Leute, die gleichzeitig reden, machen die Erkennung schwerer.</p>';
+    $('#main').innerHTML=h+'</div>';return;
+  }
+
+  h+='<div class="box"><div class="vid"><div class="th" style="'+(proj.thumb?'background-image:url('+proj.thumb+')':'')+'">'+(proj.thumb?'':ic('film'))+'</div>'+
+    '<div class="tx"><b>'+esc(proj.name)+'</b><small>'+dur(proj.duration)+(proj.segments?' · '+proj.segments.length+' Sätze':'')+'</small></div></div>'+
+    (busy&&busy.kind!=='model'?'':'<button class="btn sm" data-act="newvid">Anderes Video</button>')+'</div>';
+
+  if(busy&&busy.kind!=='model'){h+=busyBox();$('#main').innerHTML=h+'</div>';return;}
+
+  if(!proj.segments){
+    var mins=Math.max(1,Math.round((proj.duration||60)/60/4));
+    h+='<button class="btn pri wide" data-act="analyze">'+ic('wand')+'Englisch erkennen und übersetzen</button>'+
+      '<p class="hint" style="text-align:center">Dauert etwa '+mins+' Min. Danach kannst du jeden Satz prüfen und verbessern.</p>';
+    if(proj.duration>3600)h+='<p class="note">Das Video ist über eine Stunde lang. Das geht, braucht aber viel Zeit und Akku. Am besten ans Ladekabel.</p>';
+    $('#main').innerHTML=h+'</div>';return;
+  }
+
+  if(proj.result){
+    h+='<div class="done"><b class="h">'+ic('check')+' Deutsche Fassung fertig</b><small class="hint">Gespeichert in der Galerie unter „Movies/Fox Dub“.</small>'+
+      '<div class="row"><button class="btn pri" data-act="play" data-uri="'+esc(proj.result.uri)+'">'+ic('play')+'Abspielen</button>'+
+      '<button class="btn" data-act="share" data-uri="'+esc(proj.result.uri)+'">'+ic('share')+'Teilen</button></div></div>';
+  }
+
+  // Stimme und Ton
+  var vs=voices.filter(function(v){return !v.missing;});
+  var opts=vs.length?vs.map(function(v){return '<option value="'+esc(v.name)+'"'+(v.name===set.voice?' selected':'')+'>'+esc(voiceLabel(v))+'</option>';}).join(''):'<option value="">Standardstimme</option>';
+  h+='<div class="box"><p class="lbl">Stimme und Ton</p>'+
+    '<div class="inrow" style="display:flex;gap:8px"><select id="voiceSel" aria-label="Deutsche Stimme">'+opts+'</select><button class="btn" data-act="probe" aria-label="Stimme anhören">'+ic('speak')+'</button></div>'+
+    '<div><div class="sl"><label for="rate">Sprechtempo</label><span id="rateV">'+Math.round(set.rate*100)+' %</span></div><input type="range" id="rate" min="0.8" max="1.5" step="0.05" value="'+set.rate+'"></div>'+
+    '<div><div class="sl"><label for="bg">Originalton im Hintergrund</label><span id="bgV">'+Math.round(set.bg*100)+' %</span></div><input type="range" id="bg" min="0" max="0.6" step="0.05" value="'+set.bg+'"></div>'+
+    '<small class="hint">Bei 0 % hörst du nur die deutsche Stimme. Etwas Originalton lässt Musik und Geräusche drin, die englische Stimme bleibt leise darunter.</small></div>';
+
+  h+='<button class="btn pri wide" data-act="render">'+ic('film')+(proj.result?'Neu erstellen':'Deutsche Fassung erstellen')+'</button>'+
+    '<div class="row"><button class="btn sm" data-act="srt">'+ic('sub')+'Untertitel teilen</button><button class="btn sm" data-act="reanalyze">Neu erkennen</button></div>';
+
+  h+='<h2>Text prüfen</h2><p class="hint">So spricht die deutsche Stimme. Tipp in einen Satz, um ihn zu verbessern. Mit dem Lautsprecher-Knopf schaltest du einen Satz stumm.</p>';
+  proj.segments.forEach(function(s,i){
+    h+='<div class="seg'+(s.off?' off':'')+'"><div class="top"><span class="tm">'+tm(s.s)+' – '+tm(s.e)+'</span>'+
+      '<button class="ib sm" data-act="say" data-i="'+i+'" aria-label="Satz anhören">'+ic('play')+'</button>'+
+      '<button class="ib sm" data-act="mute" data-i="'+i+'" aria-label="'+(s.off?'Satz einschalten':'Satz stumm schalten')+'">'+ic(s.off?'mute':'speak')+'</button></div>'+
+      '<div class="en">'+esc(s.en)+'</div><textarea rows="2" data-seg="'+i+'" aria-label="Deutscher Text">'+esc(s.de)+'</textarea></div>';
+  });
+  $('#main').innerHTML=h+'</div>';
+}
+
+function srtText(){
+  return proj.segments.filter(function(s){return !s.off&&s.de;}).map(function(s,i){return (i+1)+'\n'+srtT(s.s)+' --> '+srtT(s.e)+'\n'+s.de+'\n';}).join('\n');
+}
+
+/* ================= Meine Videos ================= */
+function renderList(){
+  var h='<div class="view"><h2>Meine Videos</h2>';
+  if(!videos.length){
+    h+='<div class="empty"><svg viewBox="0 0 112 108"><use href="#fox"/></svg><div>Noch keine deutschen Fassungen.<br>Starte unter „Synchronisieren“.</div></div>';
+  }else{
+    videos.slice().reverse().forEach(function(v){
+      var i=videos.indexOf(v);
+      h+='<div class="box"><div class="vid"><div class="th" style="'+(v.thumb?'background-image:url('+v.thumb+')':'')+'">'+(v.thumb?'':ic('film'))+'</div>'+
+        '<div class="tx"><b>'+esc(v.name)+'</b><small>'+new Date(v.date).toLocaleDateString('de-DE')+(v.duration?' · '+dur(v.duration):'')+'</small></div></div>'+
+        '<div class="row"><button class="btn sm pri" data-act="play" data-uri="'+esc(v.uri)+'">'+ic('play')+'Abspielen</button>'+
+        '<button class="btn sm" data-act="share" data-uri="'+esc(v.uri)+'">'+ic('share')+'Teilen</button>'+
+        '<button class="ib sm" data-act="delv" data-i="'+i+'" aria-label="Aus Liste entfernen">'+ic('trash')+'</button></div></div>';
+    });
+    h+='<p class="hint" style="text-align:center">Die Videos liegen in der Galerie unter „Movies/Fox Dub“. Entfernen löscht nur den Eintrag hier.</p>';
+  }
+  $('#main').innerHTML=h+'</div>';
+}
+
+/* ================= Abläufe ================= */
+async function refreshModels(){if(!Dub)return;try{models=await Dub.status();}catch(e){models={stt:false,translate:false};}if(tab==='dub'&&!busy)renderDub();}
+async function loadVoices(){
+  if(!Dub)return;
+  try{
+    var r=await Dub.voices();voices=r.voices||[];
+    var ok=voices.filter(function(v){return !v.missing;});
+    if(!ok.some(function(v){return v.name===set.voice;})){var off=ok.filter(function(v){return !v.online&&v.country==='DE';})[0]||ok.filter(function(v){return !v.online;})[0]||ok[0];set.voice=off?off.name:'';saveSet();}
+    if(r.ok&&!ok.length)noVoice();
+  }catch(e){}
+  if(tab==='dub'&&!busy)renderDub();
+}
+function noVoice(){
+  openSheet('<h3>Deutsche Stimme fehlt</h3><div class="srow"><small style="color:var(--fg)">Auf deinem Handy ist noch keine deutsche Stimme installiert. Öffne die Sprachausgabe-Einstellungen, tippe beim Google-Modul auf das Zahnrad, dann „Sprachdaten installieren“ und lade „Deutsch (Deutschland)“.</small></div>'+
+    '<button class="btn pri wide" data-act="ttsset">Sprachausgabe öffnen</button><button class="btn wide" data-act="close">Später</button>');
+}
+async function run(kind,title,fn){
+  busy={kind:kind,title:title,pct:0,msg:'Startet …'};render();
+  try{await fn();}
+  catch(e){var m=errText(e);if(!/abgebrochen/i.test(m))openSheet('<h3>Das hat nicht geklappt</h3><div class="srow"><small style="color:var(--fg)">'+esc(m)+'</small></div><button class="btn wide" data-act="close">OK</button>');else toast('Abgebrochen.');}
+  finally{busy=null;render();}
+}
+async function pickVideo(){
+  try{
+    var v=await Dub.pickVideo();
+    if(!v.hasAudio){toast('Dieses Video hat keinen Ton.',5000);}
+    proj={uri:v.uri,name:v.name,duration:v.duration,thumb:v.thumb||'',segments:null,result:null};saveProj();renderDub();
+  }catch(e){if(!/abgebrochen|cancel/i.test(errText(e)))toast(errText(e),5000);}
+}
+function analyze(){
+  run('stt','Erkennen und übersetzen',async function(){
+    var r=await Dub.transcribe({uri:proj.uri});
+    proj.segments=r.segments||[];proj.result=null;saveProj();
+    if(!models||!models.stt||!models.translate)refreshModels();
+    toast(proj.segments.length+' Sätze gefunden. Prüf sie kurz und erstelle dann die deutsche Fassung.',5000);
+  });
+}
+function renderVideo(){
+  if(!proj.segments.some(function(s){return !s.off&&s.de.trim();})){toast('Es ist kein Satz zum Sprechen übrig.');return;}
+  run('dub','Deutsche Fassung erstellen',async function(){
+    var r=await Dub.render({uri:proj.uri,name:proj.name,segments:proj.segments,voice:set.voice,rate:set.rate,bg:set.bg,vol:set.vol});
+    proj.result={uri:r.uri,name:r.name};saveProj();
+    videos.push({uri:r.uri,name:r.name,date:Date.now(),thumb:proj.thumb,duration:proj.duration});saveVideos();
+    toast('Fertig! Die deutsche Fassung ist in deiner Galerie.',5000);
+  });
+}
+
+/* ================= Einstellungen ================= */
+var appVer=null, upd=null, UPL=false;
+function openSheet(html){var s=$('#sheet');s.innerHTML='<div class="grip"></div>'+html;s.classList.add('open');$('#scrim').classList.add('open');s.scrollTop=0;}
+function closeSheet(){$('#sheet').classList.remove('open');$('#scrim').classList.remove('open');}
+$('#scrim').addEventListener('click',closeSheet);
+async function loadVer(){var P=plug('Updater');if(!P||appVer)return;try{var i=await P.info();appVer={code:Number(i.versionCode),name:String(i.versionName||'')};}catch(e){}}
+async function settingsSheet(){
+  await loadVer();
+  openSheet('<h3>Einstellungen</h3>'+
+    (isNative()?'<button class="srow" style="border:0;text-align:left" data-act="ttsset"><b>Deutsche Stimmen</b><small>Weitere Stimmen in der Sprachausgabe des Handys laden</small></button>'+
+    '<button class="srow" style="border:0;text-align:left" data-act="delmodels"><b>Sprachpakete löschen</b><small>'+(models&&models.stt?'Gibt etwa 70 MB frei. Du kannst sie jederzeit neu laden.':'Noch nicht geladen')+'</small></button>'+
+    '<button class="srow" style="border:0;text-align:left" data-act="upd"><b>App-Update</b><small>'+(appVer?'Version '+appVer.code+' · ':'')+'Tippen zum Prüfen'+(upd?' · Neu: '+upd.ver:'')+'</small></button>'+
+    '<div class="srow line"><div><b>Updates automatisch suchen</b><br><small>Die Installation bestätigst du selbst</small></div><input type="checkbox" class="sw" id="autoUpd"'+(set.autoUpd?' checked':'')+' aria-label="Updates automatisch suchen"></div>':'')+
+    '<div class="srow"><b>So funktioniert es</b><small>Fox Dub erkennt das Englische mit einer Spracherkennung auf dem Handy (Vosk), übersetzt mit Googles Offline-Übersetzer (ML Kit) und spricht mit der deutschen Stimme deines Handys. Nichts wird hochgeladen, nichts kostet Geld.</small></div>'+
+    '<div class="srow"><b>Nur für dich</b><small>Übersetzte Videos von anderen (YouTube, Filme, Serien) sind für den privaten Gebrauch. Nicht wieder veröffentlichen.</small></div>'+
+    '<p class="hint" style="text-align:center">Fox Dub · Design by <b style="color:var(--accent)">Mr.Fox</b></p>');
+  var au=$('#autoUpd');if(au)au.addEventListener('change',function(e){set.autoUpd=e.target.checked;saveSet();});
+}
+
+/* ================= App-Update über GitHub ================= */
+async function checkUpdate(manual){
+  var P=plug('Updater');if(!P)return;
+  await loadVer();
+  if(REPO.indexOf('__')===0){if(manual)toast('Diese Version kennt ihr GitHub-Repository nicht.');return;}
+  if(manual)toast('Suche nach Updates …');
+  try{
+    var r=await fetchT('https://api.github.com/repos/'+REPO+'/releases/latest',{headers:{'Accept':'application/vnd.github+json'}},12000);
+    if(!r.ok)throw new Error('GitHub '+r.status);
+    var j=await r.json(),m=String(j.tag_name||'').match(/(\d+)\s*$/),ver=m?parseInt(m[1],10):0;
+    var asset=(j.assets||[]).filter(function(a){return /\.apk$/i.test(a.name);})[0];
+    if(!asset)throw new Error('keine APK im Release');
+    if(appVer&&ver>appVer.code){
+      upd={ver:ver,url:asset.browser_download_url,size:asset.size,done:false,notes:String(j.body||'').split(/\r?\n/).map(function(l){return l.replace(/^[\s*•-]+/,'').trim();}).filter(function(l){return l&&!/^(co-authored-by|claude-session)/i.test(l)&&!/^https?:/.test(l);})};
+      updateSheet();
+    }else if(manual)toast('Du hast die neueste Version ('+(appVer?appVer.code:'?')+').');
+  }catch(e){if(manual)toast('Update-Prüfung fehlgeschlagen: '+errText(e).slice(0,100));}
+}
+function updateSheet(){
+  var mb=upd.size?' · '+(upd.size/1048576).toFixed(1).replace('.',',')+' MB':'';
+  openSheet('<h3>Neues Update bereit</h3><div class="srow"><b>Version '+upd.ver+'</b><small>Installiert: '+(appVer?appVer.code:'?')+mb+'</small></div>'+
+    '<div class="srow"><b>Was ist neu</b>'+(upd.notes.length?'<ul style="margin:0;padding-left:20px">'+upd.notes.slice(0,12).map(function(l){return '<li>'+esc(l)+'</li>';}).join('')+'</ul>':'<small>Kleine Verbesserungen und Fehlerbehebungen</small>')+'</div>'+
+    '<button class="btn pri wide" data-act="updgo">Jetzt aktualisieren</button><button class="btn wide" data-act="close">Später</button>');
+}
+async function doUpdate(){
+  var P=plug('Updater');if(!P||!upd)return;
+  if(!UPL){UPL=true;
+    try{P.addListener('progress',function(e){var a=$('#updP'),b=$('#updB'),p=(e&&e.percent)||0;if(a)a.textContent='Lade … '+p+' %';if(b)b.style.width=p+'%';});}catch(x){}
+    try{P.addListener('installResult',function(e){var st=e&&e.status,m=String((e&&e.message)||'');if(st===0)return;if(st===3){toast('Installation abgebrochen.');return;}
+      var t=(st===7||st===5||/INCOMPATIBLE|signature|CONFLICT/i.test(m))?'Die Signatur passt nicht zur installierten App. Deinstalliere Fox Dub einmal und installiere die neueste Version von GitHub von Hand.':st===6?'Auf dem Handy ist zu wenig Speicher frei.':'Android hat die Installation abgelehnt.';
+      openSheet('<h3>Installation fehlgeschlagen</h3><div class="srow"><small style="color:var(--fg)">'+esc(t)+'</small><small>Technisch: '+esc(m.slice(0,160)||('Code '+st))+'</small></div><button class="btn wide" data-act="close">OK</button>');});}catch(x){}
+  }
+  try{
+    if(!upd.done){
+      openSheet('<h3>Update wird geladen</h3><div class="srow"><b id="updP">Lade … 0 %</b><div class="prog"><i id="updB" style="width:0"></i></div></div>');
+      await P.download({url:upd.url});upd.done=true;
+    }
+    closeSheet();await P.install();
+  }catch(e){var m=errText(e);closeSheet();
+    if(/permission/i.test(m))toast('Erlaube Fox Dub in den Einstellungen „Apps installieren“ und tippe danach nochmal auf App-Update.',6000);
+    else toast('Update fehlgeschlagen: '+m.slice(0,200),6000);}
+}
+
+/* ================= Eingaben ================= */
+document.addEventListener('input',function(e){
+  var t=e.target;
+  if(t.dataset&&t.dataset.seg!=null&&proj&&proj.segments){proj.segments[+t.dataset.seg].de=t.value;clearTimeout(tvSave);tvSave=setTimeout(saveProj,600);}
+  else if(t.id==='rate'){set.rate=parseFloat(t.value);$('#rateV').textContent=Math.round(set.rate*100)+' %';}
+  else if(t.id==='bg'){set.bg=parseFloat(t.value);$('#bgV').textContent=Math.round(set.bg*100)+' %';}
+});
+document.addEventListener('change',function(e){
+  var t=e.target;
+  if(t.id==='voiceSel'){set.voice=t.value;saveSet();Dub.preview({text:'Hallo, so klingt diese Stimme.',voice:set.voice,rate:set.rate});}
+  else if(t.id==='rate'||t.id==='bg')saveSet();
+});
+document.addEventListener('click',async function(e){
+  var b=e.target.closest('[data-act]');if(!b)return;
+  var a=b.dataset.act, i=b.dataset.i!=null?+b.dataset.i:-1;
+  switch(a){
+    case 'settings':settingsSheet();break;
+    case 'close':closeSheet();break;
+    case 'pick':pickVideo();break;
+    case 'newvid':if(proj&&proj.segments&&!proj.result){openSheet('<h3>Anderes Video wählen?</h3><div class="srow"><small style="color:var(--fg)">Die erkannten Sätze von „'+esc(proj.name)+'“ gehen dabei verloren.</small></div><button class="btn pri wide" data-act="newyes">Ja, anderes Video</button><button class="btn wide" data-act="close">Abbrechen</button>');}else{proj=null;saveProj();pickVideo();}break;
+    case 'newyes':closeSheet();proj=null;saveProj();pickVideo();break;
+    case 'models':run('model','Sprachpakete laden',async function(){await Dub.downloadModels();await refreshModels();toast('Fertig eingerichtet. Ab jetzt läuft alles offline.');});break;
+    case 'delmodels':closeSheet();try{await Dub.deleteModels();}catch(x){}await refreshModels();toast('Sprachpakete gelöscht.');break;
+    case 'analyze':analyze();break;
+    case 'reanalyze':openSheet('<h3>Nochmal erkennen?</h3><div class="srow"><small style="color:var(--fg)">Deine Änderungen an den deutschen Sätzen gehen dabei verloren.</small></div><button class="btn pri wide" data-act="reyes">Ja, neu erkennen</button><button class="btn wide" data-act="close">Abbrechen</button>');break;
+    case 'reyes':closeSheet();proj.segments=null;proj.result=null;saveProj();analyze();break;
+    case 'cancel':b.disabled=true;b.textContent='Wird abgebrochen …';try{await Dub.cancel();}catch(x){}break;
+    case 'render':renderVideo();break;
+    case 'probe':Dub.preview({text:'Hallo, ich bin dein Fox Dub. So klinge ich auf Deutsch.',voice:set.voice,rate:set.rate}).catch(function(err){toast(errText(err));});break;
+    case 'say':{var s=proj.segments[i];if(s&&s.de)Dub.preview({text:s.de,voice:set.voice,rate:set.rate}).catch(function(err){toast(errText(err));});break;}
+    case 'mute':{var s2=proj.segments[i];s2.off=!s2.off;saveProj();var card=b.closest('.seg');card.classList.toggle('off',s2.off);b.innerHTML=ic(s2.off?'mute':'speak');b.setAttribute('aria-label',s2.off?'Satz einschalten':'Satz stumm schalten');break;}
+    case 'srt':Dub.shareText({name:String(proj.name).replace(/\.[a-z0-9]{2,4}$/i,'')+' (Deutsch).srt',text:srtText()}).catch(function(err){toast(errText(err));});break;
+    case 'play':Dub.play({uri:b.dataset.uri}).catch(function(err){toast(errText(err));});break;
+    case 'share':Dub.share({uri:b.dataset.uri}).catch(function(err){toast(errText(err));});break;
+    case 'delv':videos.splice(i,1);saveVideos();renderList();break;
+    case 'ttsset':closeSheet();Dub.ttsSettings().catch(function(){toast('Einstellungen lassen sich nicht öffnen.');});break;
+    case 'upd':closeSheet();checkUpdate(true);break;
+    case 'updgo':doUpdate();break;
+  }
+});
+
+/* ================= Start ================= */
+render();
+setTimeout(function(){$('#splash').classList.add('hide');},900);
+if(Dub){
+  refreshModels();loadVoices();
+  if(proj&&proj.uri)Dub.exists({uri:proj.uri}).then(function(r){if(!r.ok&&!busy){proj=null;saveProj();renderDub();toast('Das letzte Video ist nicht mehr da.');}}).catch(function(){});
+  document.addEventListener('visibilitychange',function(){if(!document.hidden&&!busy)loadVoices();});
+}
+if(isNative()&&set.autoUpd){
+  var lastU=0;try{lastU=Number(localStorage.getItem('fd-upd-t')||0);}catch(e){}
+  if(Date.now()-lastU>6*3600e3){try{localStorage.setItem('fd-upd-t',String(Date.now()));}catch(e){}setTimeout(function(){checkUpdate(false);},3000);}
+}
+</script>
+</body>
+</html>
