@@ -23,7 +23,7 @@ const pkg = (fs.readFileSync(generated, 'utf8').match(/^\s*package\s+([\w.]+)\s*
 if (!pkg) fail('Paketname nicht lesbar');
 console.log('Android-Paket: ' + pkg);
 
-for (const f of ['MainActivity.java', 'DubPlugin.java', 'LiveService.java', 'UpdatePlugin.java']) {
+for (const f of ['MainActivity.java', 'DubPlugin.java', 'LiveService.java', 'Whisper.java', 'UpdatePlugin.java']) {
   const src = fs.readFileSync(f, 'utf8').replace(/^\s*package\s+[\w.]+\s*;/m, 'package ' + pkg + ';');
   fs.writeFileSync(path.join(dir, f), src);
   console.log('kopiert: ' + f);
@@ -101,6 +101,24 @@ if (!g.includes('vosk-android')) {
   if (g2 === g) fail('dependencies { } in build.gradle nicht gefunden');
   g = g2;
   console.log('Vosk und ML Kit eingetragen');
+}
+
+// ---- Whisper: nativer Teil (C++), nur fuer 64-Bit-Handys (arm64) ----
+if (!fs.existsSync(path.join('cpp', 'whisper.cpp', 'src', 'whisper.cpp'))) fail('cpp/whisper.cpp fehlt (wird im Workflow geladen)');
+fs.cpSync('cpp', path.join('android', 'app', 'src', 'main', 'cpp'), { recursive: true });
+if (!g.includes('externalNativeBuild')) {
+  let g2 = g.replace(/(defaultConfig\s*\{\s*\n)/,
+    '$1' +
+    "        ndk { abiFilters 'arm64-v8a' }\n" +
+    "        externalNativeBuild { cmake { arguments '-DCMAKE_BUILD_TYPE=Release' } }\n");
+  if (g2 === g) fail('defaultConfig in build.gradle nicht gefunden');
+  const ndk = process.env.ANDROID_NDK_LATEST_HOME ? path.basename(process.env.ANDROID_NDK_LATEST_HOME) : '';
+  g2 = g2.replace(/^android\s*\{\s*\n/m,
+    'android {\n' +
+    (ndk ? '    ndkVersion "' + ndk + '"\n' : '') +
+    "    externalNativeBuild { cmake { path 'src/main/cpp/CMakeLists.txt' } }\n");
+  g = g2;
+  console.log('Whisper eingetragen' + (ndk ? ' (NDK ' + ndk + ')' : ''));
 }
 
 // ---- Fester Signierschluessel (sonst lehnt Android jedes Update ab) ----

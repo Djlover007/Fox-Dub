@@ -99,6 +99,7 @@ public class DubPlugin extends Plugin {
 
     private static final String MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip";
     private static final String MODEL_DIR = "vosk-en";
+    private static final String WHISPER_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en-q5_1.bin";
 
     private final ExecutorService exec = Executors.newSingleThreadExecutor();
     private volatile boolean cancel = false;
@@ -228,7 +229,11 @@ public class DubPlugin extends Plugin {
     }
 
     @PluginMethod
-    public void cancel(PluginCall call) { cancel = true; call.resolve(); }
+    public void cancel(PluginCall call) {
+        cancel = true;
+        try { if (Whisper.loaded) Whisper.cancel(true); } catch (Throwable ignored) {}
+        call.resolve();
+    }
 
     // ------------------------------------------------------------------ Video wählen
 
@@ -329,6 +334,8 @@ public class DubPlugin extends Plugin {
                         new TranslateRemoteModel.Builder(TranslateLanguage.GERMAN).build()), 20, TimeUnit.SECONDS);
             } catch (Exception ignored) {}
             o.put("translate", tr);
+            o.put("whisper", whisperReady());
+            o.put("whisperLib", Whisper.loaded);
             o.put("tts", ttsReady());
             call.resolve(o);
         });
@@ -356,6 +363,7 @@ public class DubPlugin extends Plugin {
         exec.execute(() -> {
             if (model != null) { try { model.close(); } catch (Exception ignored) {} model = null; }
             deleteRec(modelDir());
+            deleteRec(whisperFile().getParentFile());
             try {
                 Tasks.await(RemoteModelManager.getInstance().deleteDownloadedModel(
                         new TranslateRemoteModel.Builder(TranslateLanguage.GERMAN).build()), 30, TimeUnit.SECONDS);
@@ -372,28 +380,173 @@ public class DubPlugin extends Plugin {
         f.delete();
     }
 
-    private void ensureStt() throws Exception {
-        if (sttReady()) return;
-        File zip = new File(getContext().getCacheDir(), "vosk.zip");
-        HttpURLConnection c = (HttpURLConnection) new URL(MODEL_URL).openConnection();
+    private void download(String url, File dest, String label, double p0, double p1) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(20000);
         c.setReadTimeout(60000);
         c.setInstanceFollowRedirects(true);
         c.setRequestProperty("User-Agent", "FoxDub");
         int code = c.getResponseCode();
-        if (code != 200) throw new Exception("Download der Spracherkennung fehlgeschlagen (HTTP " + code + ")");
+        if (code != 200) { c.disconnect(); throw new Exception("Download fehlgeschlagen (HTTP " + code + ")"); }
         long total = c.getContentLength();
-        try (InputStream in = new BufferedInputStream(c.getInputStream()); OutputStream out = new FileOutputStream(zip)) {
+        try (InputStream in = new BufferedInputStream(c.getInputStream()); OutputStream out = new FileOutputStream(dest)) {
             byte[] b = new byte[65536];
             long got = 0; int n, lastP = -1;
             while ((n = in.read(b)) > 0) {
                 if (cancel) throw new Cancelled();
                 out.write(b, 0, n);
                 got += n;
-                int p = total > 0 ? (int) (got * 85 / total) : 0;
-                if (p != lastP) { lastP = p; progress("model", p, "Spracherkennung wird geladen … " + (got >> 20) + " MB"); }
+                int p = total > 0 ? (int) (p0 + (p1 - p0) * got / total) : (int) p0;
+                if (p != lastP) { lastP = p; progress("model", p, label + " " + (got >> 20) + " MB"); }
             }
+        } catch (Exception e) {
+            //noinspection ResultOfMethodCallIgnored
+            dest.delete();
+            throw e;
         } finally { c.disconnect(); }
+    }
+
+    // ------------------------------------------------------------------ Whisper (genaue Erkennung)
+
+    private File whisperFile() { return new File(new File(getContext().getFilesDir(), "whisper"), "base.en-q5_1.bin"); }
+    private boolean whisperReady() { File f = whisperFile(); return f.exists() && f.length() > 30L * 1024 * 1024; }
+
+    @PluginMethod
+    public void downloadWhisper(PluginCall call) {
+        cancel = false;
+        exec.execute(() -> {
+            awake(true);
+            try {
+                if (!Whisper.loaded) throw new Exception("Whisper ist in dieser App-Version nicht verfügbar: " + Whisper.loadError);
+                if (!whisperReady()) {
+                    File f = whisperFile();
+                    f.getParentFile().mkdirs();
+                    File tmp = new File(f.getParentFile(), "download.tmp");
+                    download(WHISPER_URL, tmp, "Whisper wird geladen …", 0, 100);
+                    if (tmp.length() < 30L * 1024 * 1024) { tmp.delete(); throw new Exception("Whisper-Download unvollständig. Bitte nochmal."); }
+                    if (!tmp.renameTo(f)) throw new Exception("Whisper konnte nicht gespeichert werden");
+                }
+                progress("model", 100, "Fertig");
+                call.resolve();
+            } catch (Exception e) {
+                call.reject(msg(e));
+            } finally { awake(false); }
+        });
+    }
+
+    private static String cleanWhisper(String t) {
+        t = t.replaceAll("\\[[^\\]]*\\]", " ").replaceAll("\\([^)]*\\)", " ").replace("♪", " ").replaceAll("\\s+", " ").trim();
+        if (t.replaceAll("[\\p{Punct}\\s]", "").isEmpty()) return "";
+        return t;
+    }
+
+    // Erkennt das ganze Video in Stücken von etwa 5 Minuten (sonst wird der Speicher knapp).
+    private void whisperTranscribe(Uri uri, List<double[]> spans, List<String> texts) throws Exception {
+        Whisper.cancel(false);
+        double totalSec = 0;
+        MediaMetadataRetriever mr = new MediaMetadataRetriever();
+        try {
+            mr.setDataSource(getContext(), uri);
+            String d = mr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+            if (d != null) totalSec = Long.parseLong(d) / 1000.0;
+        } catch (Exception ignored) {} finally { try { mr.release(); } catch (Exception ignored) {} }
+        final double total = Math.max(1, totalSec);
+
+        progress("stt", 1, "Whisper startet …");
+        final long ctx = Whisper.init(whisperFile().getAbsolutePath());
+        if (ctx == 0) {
+            deleteRec(whisperFile().getParentFile());
+            throw new Exception("Das Whisper-Paket ist beschädigt und wurde gelöscht. Bitte neu laden.");
+        }
+        final int threads = Math.max(2, Math.min(4, Runtime.getRuntime().availableProcessors()));
+        final int CHUNK = 16000 * 300;
+        final float[] buf = new float[CHUNK + 16000 * 2];
+        final int[] fill = {0};
+        final double[] offset = {0};
+        final String[] last = {""};
+        final Resampler[] rs = new Resampler[1];
+        final short[][] mono = new short[1][4096];
+
+        // verarbeitet buf[0..len) und schiebt den Rest nach vorne
+        class Chunk {
+            void run(int len) throws Exception {
+                if (len < 1600) { fill[0] = 0; return; }
+                final double off = offset[0], secs = len / 16000.0;
+                float[] part = buf;
+                String json = Whisper.full(ctx, part, len, threads, pct -> {
+                    double done = off + secs * pct / 100.0;
+                    progress("stt", 2 + 78 * Math.min(1, done / total), "Englisch wird erkannt … " + tm(done) + " von " + tm(total));
+                });
+                if (cancel) throw new Cancelled();
+                if (json == null) throw new Exception("Whisper konnte das Stück ab " + tm(off) + " nicht erkennen.");
+                JSONArray a = new JSONArray(json);
+                for (int i = 0; i < a.length(); i++) {
+                    JSONObject o = a.getJSONObject(i);
+                    String t = cleanWhisper(o.optString("t", ""));
+                    if (t.isEmpty() || t.equalsIgnoreCase(last[0])) continue;
+                    last[0] = t;
+                    double s = off + o.optDouble("s", 0), e = off + o.optDouble("e", 0);
+                    if (e <= s) e = s + 0.5;
+                    spans.add(new double[]{s, e});
+                    texts.add(t);
+                }
+                offset[0] = off + secs;
+                int rest = fill[0] - len;
+                if (rest > 0) System.arraycopy(buf, len, buf, 0, rest);
+                fill[0] = Math.max(0, rest);
+            }
+        }
+        final Chunk chunk = new Chunk();
+        try {
+            decodeAudio(uri, (b, n, ch, rate) -> {
+                int fr = n / Math.max(1, ch);
+                if (mono[0].length < fr) mono[0] = new short[fr];
+                short[] m = mono[0];
+                for (int i = 0; i < fr; i++) {
+                    int sum = 0;
+                    for (int c = 0; c < ch; c++) sum += b[i * ch + c];
+                    m[i] = (short) (sum / ch);
+                }
+                if (rs[0] == null) rs[0] = new Resampler(rate, 16000);
+                int cnt = rs[0].process(m, fr);
+                short[] o = rs[0].out;
+                int k = 0;
+                while (k < cnt) {
+                    int room = Math.min(cnt - k, buf.length - fill[0]);
+                    for (int i = 0; i < room; i++) buf[fill[0] + i] = o[k + i] / 32768f;
+                    fill[0] += room;
+                    k += room;
+                    if (fill[0] >= CHUNK) chunk.run(quietCut(buf, CHUNK));
+                }
+            }, null, 0, 0, null);
+            if (fill[0] > 0) chunk.run(fill[0]);
+        } finally {
+            Whisper.free(ctx);
+        }
+        if (texts.isEmpty()) throw new Exception("Im Video wurde keine englische Sprache erkannt.");
+    }
+
+    // leiseste Stelle in den letzten 8 Sekunden suchen, damit kein Wort zerschnitten wird
+    private static int quietCut(float[] b, int len) {
+        int win = 1600, best = len;
+        double bestE = Double.MAX_VALUE;
+        for (int st = Math.max(0, len - 16000 * 8); st + win <= len; st += 800) {
+            double e = 0;
+            for (int i = st; i < st + win; i++) e += b[i] * b[i];
+            if (e < bestE) { bestE = e; best = st + win / 2; }
+        }
+        return best;
+    }
+
+    private static String tm(double t) {
+        int s = (int) Math.max(0, t);
+        return (s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60);
+    }
+
+    private void ensureStt() throws Exception {
+        if (sttReady()) return;
+        File zip = new File(getContext().getCacheDir(), "vosk.zip");
+        download(MODEL_URL, zip, "Spracherkennung wird geladen …", 0, 85);
 
         progress("model", 88, "Wird entpackt …");
         File tmp = new File(getContext().getFilesDir(), MODEL_DIR + ".tmp");
@@ -498,7 +651,7 @@ public class DubPlugin extends Plugin {
                         }
                         sink.put(sb, n, ch, rate);
                         frames += n / Math.max(1, ch);
-                        if (durUs > 0) {
+                        if (durUs > 0 && phase != null) {
                             int p = (int) (p0 + (p1 - p0) * Math.min(1.0, info.presentationTimeUs / (double) durUs));
                             if (p != lastP) { lastP = p; progress(phase, p, text); }
                         }
@@ -557,11 +710,19 @@ public class DubPlugin extends Plugin {
     public void transcribe(PluginCall call) {
         String u = call.getString("uri");
         if (u == null) { call.reject("uri fehlt"); return; }
+        final boolean useWhisper = "whisper".equals(call.getString("engine", "vosk"));
         cancel = false;
         exec.execute(() -> {
             awake(true);
             Recognizer rec = null;
             try {
+              List<double[]> spans = new ArrayList<>();
+              List<String> texts = new ArrayList<>();
+              if (useWhisper) {
+                if (!Whisper.loaded) throw new Exception("Whisper ist in dieser App-Version nicht verfügbar.");
+                if (!whisperReady()) throw new Exception("Lade zuerst Whisper.");
+                whisperTranscribe(Uri.parse(u), spans, texts);
+              } else {
                 if (!sttReady()) ensureStt();
                 progress("stt", 1, "Spracherkennung startet …");
                 if (model == null) model = new Model(modelDir().getAbsolutePath());
@@ -586,10 +747,8 @@ public class DubPlugin extends Plugin {
                 }, "stt", 2, 80, "Englisch wird erkannt …");
                 readWords(r.getFinalResult(), words);
                 if (words.isEmpty()) throw new Exception("Im Video wurde keine englische Sprache erkannt.");
-
-                List<double[]> spans = new ArrayList<>();
-                List<String> texts = new ArrayList<>();
                 segment(words, spans, texts);
+              }
 
                 progress("tr", 81, "Übersetzer startet …");
                 Translator t = translator();
@@ -658,7 +817,8 @@ public class DubPlugin extends Plugin {
     private static String sentence(String t) {
         t = t.trim().replaceAll("\\bi\\b", "I").replaceAll("\\bi'(m|ve|ll|d)\\b", "I'$1");
         if (t.isEmpty()) return t;
-        return Character.toUpperCase(t.charAt(0)) + t.substring(1) + ".";
+        t = Character.toUpperCase(t.charAt(0)) + t.substring(1);
+        return t.matches(".*[.!?…\"']$") ? t : t + ".";
     }
 
     // ------------------------------------------------------------------ Stimmen

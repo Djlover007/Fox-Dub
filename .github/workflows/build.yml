@@ -28,6 +28,8 @@ jobs:
           sed -i "s#__REPO__#${{ github.repository }}#" www/index.html
       - run: npm install
       - run: npx cap add android
+      - name: Whisper-Quelltext laden
+        run: git clone --depth 1 --branch v1.9.5 https://github.com/ggml-org/whisper.cpp cpp/whisper.cpp
       - name: Fuchs-Icon erzeugen
         run: |
           pip install pillow

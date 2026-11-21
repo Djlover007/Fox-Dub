@@ -213,7 +213,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){retur
 function ic(n){return '<svg class="i"><use href="#i-'+n+'"/></svg>';}
 function load(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
 function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
-var set=Object.assign({voice:'',rate:1.1,bg:0.15,vol:1,autoUpd:true,liveSpeak:true,liveEn:true,liveSize:20},load('fd-set',{}));
+var set=Object.assign({voice:'',rate:1.1,bg:0.15,vol:1,autoUpd:true,engine:'whisper',liveSpeak:true,liveEn:true,liveSize:20},load('fd-set',{}));
 var proj=load('fd-proj',null);          // {uri,name,duration,thumb,segments,result}
 var videos=load('fd-videos',[]);        // fertige Videos
 var tab='dub', busy=null, models=null, voices=[], tvSave, live={running:false,supported:true}, liveBusy=false;
@@ -295,9 +295,18 @@ function renderDub(){
   if(busy&&busy.kind!=='model'){h+=busyBox();$('#main').innerHTML=h+'</div>';return;}
 
   if(!proj.segments){
-    var mins=Math.max(1,Math.round((proj.duration||60)/60/4));
-    h+='<button class="btn pri wide" data-act="analyze">'+ic('wand')+'Englisch erkennen und übersetzen</button>'+
-      '<p class="hint" style="text-align:center">Dauert etwa '+mins+' Min. Danach kannst du jeden Satz prüfen und verbessern.</p>';
+    var wOk=models&&models.whisperLib!==false, eng=wOk?set.engine:'vosk';
+    var mins=Math.max(1,Math.round((proj.duration||60)/60/(eng==='whisper'?2:4)));
+    if(wOk){
+      h+='<div class="box"><p class="lbl">Spracherkennung</p><div class="chips">'+
+        '<button class="chip" data-act="eng" data-k="whisper" aria-pressed="'+(eng==='whisper')+'">Genau (Whisper)</button>'+
+        '<button class="chip" data-act="eng" data-k="vosk" aria-pressed="'+(eng==='vosk')+'">Schnell</button></div>'+
+        '<small class="hint">'+(eng==='whisper'?'Versteht viel mehr, setzt Satzzeichen und übersetzt dadurch besser. Braucht länger.':'Schneller, macht aber mehr Fehler beim Verstehen.')+'</small>'+
+        (eng==='whisper'&&models&&!models.whisper?'<button class="btn grn wide" data-act="whisperdl">'+ic('down')+'Whisper laden (60 MB, einmalig)</button>':'')+'</div>';
+    }
+    var needDl=eng==='whisper'&&models&&!models.whisper;
+    h+='<button class="btn pri wide" data-act="analyze"'+(needDl?' disabled':'')+'>'+ic('wand')+'Englisch erkennen und übersetzen</button>'+
+      '<p class="hint" style="text-align:center">'+(needDl?'Lade zuerst Whisper oder wähle „Schnell“.':'Dauert etwa '+mins+' Min., je nach Handy. Danach kannst du jeden Satz prüfen und verbessern.')+'</p>';
     if(proj.duration>3600)h+='<p class="note">Das Video ist über eine Stunde lang. Das geht, braucht aber viel Zeit und Akku. Am besten ans Ladekabel.</p>';
     $('#main').innerHTML=h+'</div>';return;
   }
@@ -430,7 +439,8 @@ async function pickVideo(){
 }
 function analyze(){
   run('stt','Erkennen und übersetzen',async function(){
-    var r=await Dub.transcribe({uri:proj.uri});
+    var eng=(models&&models.whisperLib===false)?'vosk':set.engine;
+    var r=await Dub.transcribe({uri:proj.uri,engine:eng});
     proj.segments=r.segments||[];proj.result=null;saveProj();
     if(!models||!models.stt||!models.translate)refreshModels();
     toast(proj.segments.length+' Sätze gefunden. Prüf sie kurz und erstelle dann die deutsche Fassung.',5000);
@@ -535,6 +545,8 @@ document.addEventListener('click',async function(e){
     case 'models':run('model','Sprachpakete laden',async function(){await Dub.downloadModels();await refreshModels();toast('Fertig eingerichtet. Ab jetzt läuft alles offline.');});break;
     case 'delmodels':closeSheet();try{await Dub.deleteModels();}catch(x){}await refreshModels();toast('Sprachpakete gelöscht.');break;
     case 'analyze':analyze();break;
+    case 'eng':set.engine=b.dataset.k;saveSet();renderDub();break;
+    case 'whisperdl':run('model','Whisper laden',async function(){await Dub.downloadWhisper();await refreshModels();toast('Whisper ist bereit.');});break;
     case 'reanalyze':openSheet('<h3>Nochmal erkennen?</h3><div class="srow"><small style="color:var(--fg)">Deine Änderungen an den deutschen Sätzen gehen dabei verloren.</small></div><button class="btn pri wide" data-act="reyes">Ja, neu erkennen</button><button class="btn wide" data-act="close">Abbrechen</button>');break;
     case 'reyes':closeSheet();proj.segments=null;proj.result=null;saveProj();analyze();break;
     case 'cancel':b.disabled=true;b.textContent='Wird abgebrochen …';try{await Dub.cancel();}catch(x){}break;
